@@ -8,15 +8,18 @@ public class PlayerMovement : MonoBehaviour
     public float _movespeed, _accelspeed, horizontal_gravity;
     public float air_cap, jump_speed;
 
+    public float i_slidespeed, slidespeed, sj_speed, max_sj_speed;
+
     public float ground_check_distance;
 
-    private bool grounded;
+    private bool grounded, sliding, aircrouching;
     private float rot_x, rot_y;
 
     public Vector2 mouse_sens;
 
     private Transform cam_transform;
     private Rigidbody rb;
+    private CapsuleCollider col;
 
     void Look()
     {
@@ -31,8 +34,13 @@ public class PlayerMovement : MonoBehaviour
 
     bool CheckGrounded()
     {
-        Debug.DrawRay(transform.position - Vector3.up * 0.9f, Vector3.down * ground_check_distance, Color.blue, Time.deltaTime);
-        return Physics.Raycast(transform.position - Vector3.up * 0.9f, -Vector3.up, ground_check_distance, LayerMask.GetMask("Ground"));
+        Vector3 crouch_offset = Vector3.zero;
+        
+        if (aircrouching)
+            crouch_offset = new Vector3(0.0f, 1.0f, 0.0f);
+
+        Debug.DrawRay(transform.position - Vector3.up * 0.9f + crouch_offset, Vector3.down * ground_check_distance, Color.blue, Time.deltaTime);
+        return Physics.Raycast(transform.position - Vector3.up * 0.9f + crouch_offset, -Vector3.up, ground_check_distance, LayerMask.GetMask("Ground"));
     }
 
     void ApplyFriction()
@@ -94,12 +102,56 @@ public class PlayerMovement : MonoBehaviour
         rb.velocity += new Vector3(accelspeed * wishdir.x, accelspeed * wishdir.y, accelspeed * wishdir.z);
     }
 
+    //set sliding flag, capsule collider height, and camera positions
+    void CheckSliding()
+    {
+        if (Input.GetKey(KeyCode.LeftControl) || Input.GetKey(KeyCode.RightControl))
+        {
+            if (sliding == false)
+            {
+                col.height = 1.0f;
+                if (grounded)
+                {
+                    cam_transform.localPosition = new Vector3(0.0f, -.25f, 0.0f);
+                    col.center = new Vector3(0.0f, -0.5f, 0.0f);
+                }
+                else
+                {
+                    aircrouching = true;
+                    cam_transform.localPosition = new Vector3(0.0f, .75f, 0.0f);
+                    col.center = new Vector3(0.0f, 0.5f, 0.0f);
+                }
+            }
+            sliding = true;
+        }
+        else
+        {
+            if (sliding == true)
+            {
+                if (aircrouching)
+                {
+                    transform.position += Vector3.up * 0.5f;
+                    aircrouching = false;
+                }
+                cam_transform.localPosition = new Vector3(0.0f, 0.5f, 0.0f);
+                col.height = 2.0f;
+                col.center = new Vector3(0.0f, 0.0f, 0.0f);
+            }
+            sliding = false;
+        }
+    }
+
+    void Slide()
+    {
+    }
+
     // Start is called before the first frame update
     void Start()
     {
         rot_y = 0.0f;
         cam_transform = Camera.main.transform;
         rb = GetComponent<Rigidbody>();
+        col = GetComponent<CapsuleCollider>();
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
@@ -110,16 +162,29 @@ public class PlayerMovement : MonoBehaviour
     {
         grounded = CheckGrounded();
         Look();
-
+        CheckSliding();
+        Debug.Log($"Sliding: {sliding}, Air Crouching: {aircrouching}");
         if (grounded)
         {
             ApplyFriction();
-            GroundAccel();
-            if (Input.GetButton("Jump") && rb.velocity.y <= 0.0f) rb.velocity += Vector3.up * jump_speed;
+            if (!sliding)
+                GroundAccel();
+            else
+                Slide();
+
+            if (Input.GetButton("Jump") && rb.velocity.y <= 0.0f)
+            {
+                rb.velocity += Vector3.up * jump_speed;
+                if(sliding)
+                    rb.velocity += transform.forward * Mathf.Clamp(sj_speed * new Vector2(rb.velocity.x, rb.velocity.z).magnitude, 0.0f, max_sj_speed);
+            }
         }
         else
         {
-            AirAccel();
+            if (!sliding)
+                AirAccel();
+            else
+                Slide();
         }
     }
 }
