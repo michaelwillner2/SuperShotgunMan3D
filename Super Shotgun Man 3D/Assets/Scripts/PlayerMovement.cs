@@ -12,7 +12,7 @@ public class PlayerMovement : MonoBehaviour
 
     public float ground_check_distance;
 
-    public float max_sj_airspeed, slide_timer, current_airspeed;
+    public float max_sj_airspeed, slide_timer, current_airspeed, slope_accel;
 
     private bool grounded, sliding, aircrouching, set_slide_vector, set_slide_speed;
     private float rot_x, rot_y;
@@ -43,7 +43,7 @@ public class PlayerMovement : MonoBehaviour
         
         if (aircrouching)
             crouch_offset = new Vector3(0.0f, 1.0f, 0.0f);
-
+        
         Debug.DrawRay(transform.position - Vector3.up * 0.9f + crouch_offset, Vector3.down * ground_check_distance, Color.blue, Time.deltaTime);
         return Physics.Raycast(transform.position - Vector3.up * 0.9f + crouch_offset, -Vector3.up, ground_check_distance, LayerMask.GetMask("Ground"));
     }
@@ -117,6 +117,11 @@ public class PlayerMovement : MonoBehaviour
                 col.height = 1.0f;
                 if (grounded)
                 {
+                    if (aircrouching)
+                    {
+                        transform.position += Vector3.up;
+                        aircrouching = false;
+                    }
                     cam_transform.localPosition = new Vector3(0.0f, -.25f, 0.0f);
                     col.center = new Vector3(0.0f, -0.5f, 0.0f);
                     sliding = true;
@@ -131,7 +136,7 @@ public class PlayerMovement : MonoBehaviour
         }
         else
         {
-            if (sliding == true)
+            if (sliding == true || aircrouching)
             {
                 if (aircrouching)
                 {
@@ -166,7 +171,7 @@ public class PlayerMovement : MonoBehaviour
         {
             if (!set_slide_vector)
             {
-                slide_vector = rb.velocity.normalized;
+                slide_vector = (transform.forward * Input.GetAxis("Vertical") + transform.right * Input.GetAxis("Horizontal")).normalized;
                 if (slide_vector.magnitude == 0.0f) slide_vector = transform.forward;
                 set_slide_vector = true;
             }
@@ -174,12 +179,38 @@ public class PlayerMovement : MonoBehaviour
             {
                 current_slide_speed = current_airspeed;
             }
-            if (slide_timer > 0.0f)
-                slide_timer -= Time.deltaTime;
-            else
-                slide_timer = 0.0f;
+            //Update the slide vector based off from slopes that the player is currently on
+            Vector3 crouch_offset = Vector3.zero;
 
-            rb.velocity = slide_vector * Mathf.Lerp(slidespeed, current_slide_speed, slide_timer / max_slide_timer);
+            if (aircrouching)
+                crouch_offset = new Vector3(0.0f, 1.0f, 0.0f);
+            
+            RaycastHit hit;
+            if (Physics.Raycast(transform.position - Vector3.up * 0.9f + crouch_offset, -Vector3.up, out hit, ground_check_distance, LayerMask.GetMask("Ground")))
+            {
+                //first get the normal of the surface if it is facing straight up then don't do anything else
+                Vector3 slope_norm = hit.normal;
+
+                if (hit.normal != Vector3.up)
+                {
+                    //calculate the tangent and bitangent of the slope, adjust the slide vector accordingly
+                    Vector3 tangent = Vector3.Cross(slope_norm, Vector3.up);
+                    Vector3 bitangent = Vector3.Cross(slope_norm, tangent);
+
+                    slide_vector += bitangent * slope_accel * Time.deltaTime* Mathf.Lerp(slidespeed, current_slide_speed, slide_timer / max_slide_timer);
+                }
+                else
+                {
+                    if (slide_timer > 0.0f)
+                        slide_timer -= Time.deltaTime;
+                    else
+                        slide_timer = 0.0f;
+                }
+            }
+
+            rb.velocity += slide_vector * float.PositiveInfinity;
+            float target_slide_speed = Mathf.Lerp(slidespeed, current_slide_speed, slide_timer / max_slide_timer);
+            rb.velocity = rb.velocity.normalized * target_slide_speed;
         }
     }
 
@@ -210,6 +241,7 @@ public class PlayerMovement : MonoBehaviour
             else
                 Slide();
 
+            Debug.Log(rb.velocity);
             if (Input.GetButtonDown("Jump") && rb.velocity.y <= 0.0f)
             {
                 rb.velocity = new Vector3(rb.velocity.x, jump_speed, rb.velocity.z);
@@ -217,7 +249,8 @@ public class PlayerMovement : MonoBehaviour
                 {
                     float current_vel = new Vector2(rb.velocity.x, rb.velocity.z).magnitude;
                     if (current_vel < 1.0f) current_vel = 1.0f;
-                    rb.velocity += transform.forward * Mathf.Clamp(sj_speed * current_vel, 0.0f, max_sj_speed);
+                    rb.velocity = transform.forward * Mathf.Clamp(sj_speed * current_vel, 0.0f, max_sj_speed) + transform.up * jump_speed + new Vector3(0.0f, Mathf.Clamp01(rb.velocity.y), 0.0f);
+                    set_slide_vector = false;
                 }
             }
         }
@@ -228,7 +261,6 @@ public class PlayerMovement : MonoBehaviour
             else
                 Slide();
             set_slide_speed = false;
-            set_slide_vector = false;
         }
     }
 }
