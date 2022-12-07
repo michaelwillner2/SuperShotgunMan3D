@@ -14,10 +14,14 @@ public class PlayerMovement : MonoBehaviour
 
     public float max_sj_airspeed, slide_timer, current_airspeed, slope_accel;
 
+    public float viewbob_amplitude, viewbob_frequency, cam_roll_amount;
+
     private bool grounded, sliding, aircrouching, set_slide_vector, set_slide_speed;
     private float rot_x, rot_y;
 
     private float max_slide_timer, current_slide_speed;
+
+    private float animation_tick;
 
     public Vector2 mouse_sens;
 
@@ -25,16 +29,27 @@ public class PlayerMovement : MonoBehaviour
     private Rigidbody rb;
     private CapsuleCollider col;
     private Vector3 slide_vector;
+    private Vector3 cam_pivot;
 
     void Look()
     {
+        //handle camera rotation
         rot_x += Input.GetAxis("Mouse X") * mouse_sens.x;
         rot_y += Input.GetAxis("Mouse Y") * mouse_sens.y;
 
         rot_y = Mathf.Clamp(rot_y, -90.0f, 90.0f);
 
-        cam_transform.localRotation = Quaternion.Euler(-rot_y, 0.0f, 0.0f);
         transform.rotation = Quaternion.Euler(0.0f, rot_x, 0.0f);
+
+        //handle camera roll and bobbing
+        cam_transform.localPosition = cam_pivot;
+        float velocity_scalar = rb.velocity.magnitude / _movespeed;
+        if (grounded && !sliding) {
+            cam_transform.localPosition += Vector3.up * Mathf.Sin(animation_tick * viewbob_frequency) * viewbob_amplitude * velocity_scalar;
+        }
+
+        float vel_proj = Vector3.Dot(rb.velocity.normalized, transform.right) * Mathf.Clamp01(velocity_scalar);
+        cam_transform.localRotation = Quaternion.Euler(-rot_y, 0.0f, Mathf.Lerp(cam_roll_amount, -cam_roll_amount, (vel_proj + 1.0f) / 2.0f));
     }
 
     bool CheckGrounded()
@@ -122,14 +137,14 @@ public class PlayerMovement : MonoBehaviour
                         transform.position += Vector3.up;
                         aircrouching = false;
                     }
-                    cam_transform.localPosition = new Vector3(0.0f, -.25f, 0.0f);
+                    cam_pivot = new Vector3(0.0f, -.25f, 0.0f);
                     col.center = new Vector3(0.0f, -0.5f, 0.0f);
                     sliding = true;
                 }
                 else
                 {
                     aircrouching = true;
-                    cam_transform.localPosition = new Vector3(0.0f, .75f, 0.0f);
+                    cam_pivot = new Vector3(0.0f, .75f, 0.0f);
                     col.center = new Vector3(0.0f, 0.5f, 0.0f);
                 }
             }
@@ -143,7 +158,7 @@ public class PlayerMovement : MonoBehaviour
                     transform.position += Vector3.up * 0.5f;
                     aircrouching = false;
                 }
-                cam_transform.localPosition = new Vector3(0.0f, 0.5f, 0.0f);
+                cam_pivot = new Vector3(0.0f, 0.5f, 0.0f);
                 col.height = 2.0f;
                 col.center = new Vector3(0.0f, 0.0f, 0.0f);
             }
@@ -222,6 +237,7 @@ public class PlayerMovement : MonoBehaviour
         cam_transform = Camera.main.transform;
         rb = GetComponent<Rigidbody>();
         col = GetComponent<CapsuleCollider>();
+        cam_pivot = cam_transform.localPosition;
 
         Cursor.visible = false;
         Cursor.lockState = CursorLockMode.Locked;
@@ -230,6 +246,7 @@ public class PlayerMovement : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        Debug.Log(rb.velocity.magnitude);
         grounded = CheckGrounded();
         Look();
         CheckSliding();
@@ -240,8 +257,7 @@ public class PlayerMovement : MonoBehaviour
                 GroundAccel();
             else
                 Slide();
-
-            Debug.Log(rb.velocity);
+            
             if (Input.GetButtonDown("Jump") && rb.velocity.y <= 0.0f)
             {
                 rb.velocity = new Vector3(rb.velocity.x, jump_speed, rb.velocity.z);
@@ -262,5 +278,10 @@ public class PlayerMovement : MonoBehaviour
                 Slide();
             set_slide_speed = false;
         }
+    }
+
+    private void FixedUpdate()
+    {
+        animation_tick += Time.deltaTime * rb.velocity.magnitude / _movespeed;
     }
 }
