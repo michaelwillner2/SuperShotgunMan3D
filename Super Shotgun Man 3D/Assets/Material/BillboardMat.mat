@@ -64,7 +64,7 @@ Material:
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _SpriteSheet:
-        m_Texture: {fileID: 18700000, guid: 4a7d511e51ebf214b918b8b14954233a, type: 3}
+        m_Texture: {fileID: 18700000, guid: dcbbbd37787b6ab4db86247fbf79ebf0, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _Texture2DAsset_8e43779ea428402d9c10c4b02ca15f0d_Out_0:
@@ -93,6 +93,7 @@ Material:
     - _GlossMapScale: 1
     - _Glossiness: 0.5
     - _GlossyReflections: 1
+    - _Light: 1
     - _Metallic: 0
     - _Mode: 0
     - _OcclusionStrength: 1
@@ -109,6 +110,7 @@ Material:
     - _Color: {r: 1, g: 1, b: 1, a: 1}
     - _EmissionColor: {r: 0, g: 0, b: 0, a: 1}
     - _Mode7Resolution: {r: 1.5, g: 0.2, b: 0, a: 0}
+    - _UnlitColor: {r: 0, g: 0, b: 0, a: 1}
   m_BuildTextureStacks: []
 --- !u!114 &5671108074995789628
 MonoBehaviour:
