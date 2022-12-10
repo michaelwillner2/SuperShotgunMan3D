@@ -222,8 +222,8 @@ public class PlayerMovement : MonoBehaviour
                         slide_timer = 0.0f;
                 }
             }
-
-            rb.velocity += slide_vector * float.PositiveInfinity;
+            
+            rb.velocity += slide_vector * 1000.0f;
             float target_slide_speed = Mathf.Lerp(slidespeed, current_slide_speed, slide_timer / max_slide_timer);
             rb.velocity = rb.velocity.normalized * target_slide_speed;
         }

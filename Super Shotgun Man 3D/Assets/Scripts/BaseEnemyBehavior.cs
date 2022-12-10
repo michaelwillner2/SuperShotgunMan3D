@@ -1,9 +1,17 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Events;
 
 public class BaseEnemyBehavior : MonoBehaviour
 {
+    [System.Serializable]
+    private struct AnimAction
+    {
+        public int activation_frame;
+        public UnityEvent action;
+    }
+
     [System.Serializable]
     private struct Animation
     {
@@ -11,6 +19,8 @@ public class BaseEnemyBehavior : MonoBehaviour
         public int frame_count;
         public bool looping;
         public float speed_fps;
+
+        public List<AnimAction> actions;
     }
 
     public int current_frame;
@@ -20,7 +30,7 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     public float step_distance, step_frequency, max_step_height;
 
-    private int last_animation;
+    private int last_animation, last_frame;
 
     [SerializeField]
     private int step_count, targeting_threshold;
@@ -38,7 +48,7 @@ public class BaseEnemyBehavior : MonoBehaviour
     private BoxCollider col;
 
     //function handles collision checks
-    bool CheckNextPostion(Vector3 direction)
+    public virtual bool CheckNextPostion(Vector3 direction)
     {
         Vector3 half_extents = new Vector3(col.size.x, col.size.y, col.size.z) * 0.99f;
         RaycastHit box_hit;
@@ -46,7 +56,6 @@ public class BaseEnemyBehavior : MonoBehaviour
 
         //if a wall is detected see if you can step over the wall
         Vector3 raycast_offset = transform.position + new Vector3(half_extents.x * direction.x, 0.0f, half_extents.z * direction.z) + direction * step_distance * 0.6f;
-        Debug.DrawRay(raycast_offset, -Vector3.up *(2.01f * half_extents.y + max_step_height), Color.blue, 1.0f);
         if (!detect_wall)
         {
             RaycastHit hit;
@@ -68,14 +77,11 @@ public class BaseEnemyBehavior : MonoBehaviour
         }
         //check if there is a dropoff bigger than the step height
         if (!Physics.Raycast(raycast_offset, -Vector3.up, (2.02f * half_extents.y + max_step_height), LayerMask.GetMask("Ground")))
-        {
-            Debug.Log("Occurring");
             return false;
-        }
         return true;
     }
 
-    void UpdateAnimationViewAngle()
+    public virtual void UpdateAnimationViewAngle()
     {
         //First get the player's viewing angle and take the dot product with the enemy's look direction
         Vector2 eviewangle = new Vector2(lookdir.x, lookdir.z).normalized;
@@ -114,7 +120,7 @@ public class BaseEnemyBehavior : MonoBehaviour
             visual_mat.SetFloat("_Flip", 1);
     }
 
-    void Animate()
+    public virtual void Animate()
     {
         if (animations.Count == 0) return;
         //first get the active animation
@@ -140,9 +146,21 @@ public class BaseEnemyBehavior : MonoBehaviour
         }
 
         anim_tick += Time.deltaTime * anim.speed_fps;
+
+        if(last_frame != current_frame)
+        {
+            //loop through all actions the sprite can take at a frame if that frame is hit then perform said action
+            for (int i = 0; i < anim.actions.Count; i++)
+            {
+                if (anim.actions[i].activation_frame == current_frame)
+                    anim.actions[i].action.Invoke();
+            }
+        }
+
+        last_frame = current_frame;
     }
 
-    void ChasePlayer(GameObject target)
+    public virtual void ChasePlayer(GameObject target)
     {
         //if ready to pick a new direction
         if (step_count == 0)
@@ -298,6 +316,11 @@ public class BaseEnemyBehavior : MonoBehaviour
             }
         }
     }
+
+    public void TestAction()
+    {
+        Debug.Log($"Hey, how's it goin! The current frame is: {current_frame}!");
+    }
     
     // Start is called before the first frame update
     void Start()
@@ -319,8 +342,6 @@ public class BaseEnemyBehavior : MonoBehaviour
     {
         UpdateAnimationViewAngle();
         Animate();
-        Vector3 half_extents = new Vector3(col.size.x, col.size.y, col.size.z) * 0.99f;
-        MathUtils.DrawBoxCastBox(transform.position, half_extents, transform.rotation, lookdir, step_distance, Color.red);
         if (step_frequency > 0.0f)
             step_frequency -= Time.deltaTime;
         else
