@@ -26,14 +26,15 @@ public class BaseEnemyBehavior : MonoBehaviour
     public int current_frame;
     public int current_animation;
 
-    public int step_count_max, step_count_min;
+    public int step_count_max, step_count_min, reaction_time;
 
     public float step_distance, step_frequency, max_step_height;
+    public float min_attack_distance, max_attack_distance;
 
     private int last_animation, last_frame;
 
     [SerializeField]
-    private int step_count, targeting_threshold;
+    private int step_count, targeting_threshold, max_reaction_time;
 
     public Vector3 lookdir;
     public Texture2DArray spritesheet;
@@ -42,10 +43,13 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     private float step_frequency_max, step_height;
 
+    private bool anim_completed;
+
     private Material visual_mat;
     [SerializeField]
     private List<Animation> animations;
     private BoxCollider col;
+    private GameObject target;
 
     //function handles collision checks
     public virtual bool CheckNextPostion(Vector3 direction)
@@ -137,12 +141,16 @@ public class BaseEnemyBehavior : MonoBehaviour
             if ((int)anim_tick >= anim.frame_count)
                 anim_tick = 0.0f;
             current_frame = (int)anim_tick;
+            anim_completed = false;
         }
         else
         {
             if ((int)anim_tick >= anim.frame_count)
                 anim_tick = anim.frame_count;
             current_frame = (int)anim_tick;
+            if (current_frame >= anim.frame_count)
+                current_frame = anim.frame_count - 1;
+            anim_completed = anim_tick == anim.frame_count;
         }
 
         anim_tick += Time.deltaTime * anim.speed_fps;
@@ -308,6 +316,7 @@ public class BaseEnemyBehavior : MonoBehaviour
                 step_height = 0.0f;
                 step_count--;
                 targeting_threshold--;
+                reaction_time--;
             }
             //if it isn't, then set the step count to 0
             else
@@ -321,6 +330,47 @@ public class BaseEnemyBehavior : MonoBehaviour
     {
         Debug.Log($"Hey, how's it goin! The current frame is: {current_frame}!");
     }
+
+    public virtual void AI()
+    {
+        //in this scenario attack the player at greater frequencies at close range, must have LOS
+        if (step_count == 0 && reaction_time <= 0)
+        {
+            if (anim_completed)
+            {
+                current_animation = 0;
+                ChasePlayer(target);
+                return;
+            }
+            //calculate attack probability
+            float max_magnitude = max_attack_distance - min_attack_distance;
+            float attack_magnitude = Vector3.Distance(target.transform.position, transform.position) - min_attack_distance;
+            float distance_lerp = attack_magnitude / max_magnitude;
+
+            float attack_probability = Mathf.Lerp(100.0f, 0.0f, distance_lerp);
+            if (MathUtils.GaussianRandom(0.0f, 100.0f) <= attack_probability)
+            {
+                current_animation = 1;
+                lookdir = (target.transform.position - transform.position).normalized;
+            }
+            else if(current_animation != 1)
+            {
+                current_animation = 0;
+                ChasePlayer(target);
+                return;
+            }
+        }
+        else
+        {
+            if (step_frequency > 0.0f)
+                step_frequency -= Time.deltaTime;
+            else
+            {
+                ChasePlayer(target);
+                step_frequency = step_frequency_max;
+            }
+        }
+    }
     
     // Start is called before the first frame update
     void Start()
@@ -329,12 +379,15 @@ public class BaseEnemyBehavior : MonoBehaviour
         step_count = 0;
         anim_tick = 0.0f;
         step_frequency_max = step_frequency;
+        max_reaction_time = reaction_time;
         step_height = 0.0f;
         lookdir = transform.forward;
 
         //create a new material instance so that other enemies are unaffected
         visual_mat = transform.GetChild(0).GetComponent<MeshRenderer>().material;
         col = GetComponent<BoxCollider>();
+
+        target = GameObject.FindGameObjectWithTag("Player");
     }
 
     // Update is called once per frame
@@ -342,12 +395,6 @@ public class BaseEnemyBehavior : MonoBehaviour
     {
         UpdateAnimationViewAngle();
         Animate();
-        if (step_frequency > 0.0f)
-            step_frequency -= Time.deltaTime;
-        else
-        {
-            ChasePlayer(GameObject.FindGameObjectWithTag("Player"));
-            step_frequency = step_frequency_max;
-        }
+        AI();
     }
 }
