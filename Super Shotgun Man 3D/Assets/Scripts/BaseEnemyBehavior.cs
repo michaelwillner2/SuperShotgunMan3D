@@ -18,7 +18,7 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     public int step_count_max, step_count_min;
 
-    public float step_distance, step_frequency;
+    public float step_distance, step_frequency, max_step_height;
 
     private int last_animation;
 
@@ -30,17 +30,49 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     private float anim_tick;
 
-    private float step_frequency_max;
+    private float step_frequency_max, step_height;
 
     private Material visual_mat;
     [SerializeField]
     private List<Animation> animations;
     private BoxCollider col;
 
+    //function handles collision checks
     bool CheckNextPostion(Vector3 direction)
     {
         Vector3 half_extents = new Vector3(col.size.x, col.size.y, col.size.z) * 0.99f;
-        return !Physics.BoxCast(transform.position, half_extents, direction, transform.rotation, step_distance, LayerMask.GetMask("Ground") | LayerMask.GetMask("Player"));
+        RaycastHit box_hit;
+        bool detect_wall = !Physics.BoxCast(transform.position, half_extents, direction, out box_hit, transform.rotation, step_distance, LayerMask.GetMask("Ground") | LayerMask.GetMask("Player"));
+
+        //if a wall is detected see if you can step over the wall
+        Vector3 raycast_offset = transform.position + new Vector3(half_extents.x * direction.x, 0.0f, half_extents.z * direction.z) + direction * step_distance * 0.6f;
+        Debug.DrawRay(raycast_offset, -Vector3.up *(2.01f * half_extents.y + max_step_height), Color.blue, 1.0f);
+        if (!detect_wall)
+        {
+            RaycastHit hit;
+            Physics.Raycast(raycast_offset, -Vector3.up, out hit, half_extents.y + max_step_height, LayerMask.GetMask("Ground"));
+            if (hit.collider != null)
+            {
+                if (hit.collider.gameObject == box_hit.collider.gameObject)
+                {
+                    float wall_height = transform.position.y - hit.distance - (transform.position.y - half_extents.y);
+
+                    if (wall_height <= max_step_height)
+                    {
+                        step_height = wall_height;
+                        return true;
+                    }
+                }
+            }
+            return detect_wall;
+        }
+        //check if there is a dropoff bigger than the step height
+        if (!Physics.Raycast(raycast_offset, -Vector3.up, (2.02f * half_extents.y + max_step_height), LayerMask.GetMask("Ground")))
+        {
+            Debug.Log("Occurring");
+            return false;
+        }
+        return true;
     }
 
     void UpdateAnimationViewAngle()
@@ -150,7 +182,8 @@ public class BaseEnemyBehavior : MonoBehaviour
             if (CheckNextPostion(potential_lookdir))
             {
                 lookdir = potential_lookdir;
-                transform.position += lookdir * step_distance;
+                transform.position += lookdir * step_distance + Vector3.up * step_height;
+                step_height = 0.0f;
                 return;
             }
             //1) ortho
@@ -162,7 +195,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
 
@@ -171,7 +205,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
             }
@@ -182,7 +217,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
 
@@ -191,7 +227,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
             }
@@ -202,7 +239,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
 
@@ -211,7 +249,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (CheckNextPostion(potential_lookdir))
                 {
                     lookdir = potential_lookdir;
-                    transform.position += lookdir * step_distance;
+                    transform.position += lookdir * step_distance + Vector3.up * step_height;
+                    step_height = 0.0f;
                     return;
                 }
             }
@@ -219,7 +258,8 @@ public class BaseEnemyBehavior : MonoBehaviour
             //2) current look direction
             if (CheckNextPostion(lookdir))
             {
-                transform.position += lookdir * step_distance;
+                transform.position += lookdir * step_distance + Vector3.up * step_height;
+                step_height = 0.0f;
                 return;
             }
 
@@ -231,7 +271,8 @@ public class BaseEnemyBehavior : MonoBehaviour
             if (CheckNextPostion(potential_lookdir))
             {
                 lookdir = potential_lookdir;
-                transform.position += lookdir * step_distance;
+                transform.position += lookdir * step_distance + Vector3.up * step_height;
+                step_height = 0.0f;
                 return;
             }
 
@@ -245,7 +286,8 @@ public class BaseEnemyBehavior : MonoBehaviour
             //first see if the desired step location is valid, if it is then take a step, lower the step count and lower the targeting threshold
             if (CheckNextPostion(lookdir))
             {
-                transform.position += lookdir * step_distance;
+                transform.position += lookdir * step_distance + Vector3.up * step_height;
+                step_height = 0.0f;
                 step_count--;
                 targeting_threshold--;
             }
@@ -264,6 +306,7 @@ public class BaseEnemyBehavior : MonoBehaviour
         step_count = 0;
         anim_tick = 0.0f;
         step_frequency_max = step_frequency;
+        step_height = 0.0f;
         lookdir = transform.forward;
 
         //create a new material instance so that other enemies are unaffected
@@ -276,6 +319,8 @@ public class BaseEnemyBehavior : MonoBehaviour
     {
         UpdateAnimationViewAngle();
         Animate();
+        Vector3 half_extents = new Vector3(col.size.x, col.size.y, col.size.z) * 0.99f;
+        MathUtils.DrawBoxCastBox(transform.position, half_extents, transform.rotation, lookdir, step_distance, Color.red);
         if (step_frequency > 0.0f)
             step_frequency -= Time.deltaTime;
         else
