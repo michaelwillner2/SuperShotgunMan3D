@@ -30,10 +30,7 @@ public class PlayerMovement : MonoBehaviour
     private RectTransform shotgun_root, shotgun_position;
     [SerializeField]
     private bool fired, reloading, landed;
-
-    [SerializeField]
-    private int shells;
-
+    
     private Animator anim, r_anim;
 
     private Transform cam_transform;
@@ -41,6 +38,8 @@ public class PlayerMovement : MonoBehaviour
     private CapsuleCollider col;
     private Vector3 slide_vector;
     private Vector3 cam_pivot;
+
+    private PlayerStats stats;
 
     IEnumerator FireSequence()
     {
@@ -51,7 +50,7 @@ public class PlayerMovement : MonoBehaviour
         yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
         yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
         fired = false;
-        shells--;
+        stats.Shells--;
     }
 
     IEnumerator BigFireSequence()
@@ -63,8 +62,8 @@ public class PlayerMovement : MonoBehaviour
         yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
         yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
         fired = false;
-        shells--;
-        shells--;
+        stats.Shells--;
+        stats.Shells--;
     }
 
     IEnumerator ReloadSequence()
@@ -76,7 +75,7 @@ public class PlayerMovement : MonoBehaviour
         yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
         yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
         reloading = false;
-        shells = 2;
+        stats.Shells = 2;
     }
 
     IEnumerator JumpSequence()
@@ -132,19 +131,19 @@ public class PlayerMovement : MonoBehaviour
 
         //Handle shooting animations
         //normal behavior
-        if(shells > 0 && !reloading)
+        if(stats.Shells > 0 && !reloading)
         {
             if (Input.GetButton("Fire1") && !fired)
                 StartCoroutine(FireSequence());
 
-            if (Input.GetButton("Fire2") && !fired && shells > 1)
+            if (Input.GetButton("Fire2") && !fired && stats.Shells > 1)
                 StartCoroutine(BigFireSequence());
 
-            if (Input.GetKeyDown(KeyCode.R) && !reloading && shells < 2)
+            if (Input.GetKeyDown(KeyCode.R) && !reloading && stats.Shells < 2)
                 StartCoroutine(ReloadSequence());
         }
         //auto reload
-        else if(shells <=0)
+        else if(stats.Shells <=0)
         {
             if (!reloading)
                 StartCoroutine(ReloadSequence());
@@ -331,7 +330,7 @@ public class PlayerMovement : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
-        shells = 2;
+        stats = GetComponent<PlayerStats>();
 
         rot_y = 0.0f;
         max_slide_timer = slide_timer;
