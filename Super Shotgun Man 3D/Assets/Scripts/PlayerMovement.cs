@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.UI;
 
 public class PlayerMovement : MonoBehaviour
 {
@@ -15,6 +16,7 @@ public class PlayerMovement : MonoBehaviour
     public float max_sj_airspeed, slide_timer, current_airspeed, slope_accel;
 
     public float viewbob_amplitude, viewbob_frequency, cam_roll_amount;
+    public float shotgun_frequency, shotgun_amplitude, shotgun_sway_x;
 
     private bool grounded, sliding, aircrouching, set_slide_vector, set_slide_speed;
     private float rot_x, rot_y;
@@ -25,11 +27,73 @@ public class PlayerMovement : MonoBehaviour
 
     public Vector2 mouse_sens;
 
+    private RectTransform shotgun_root, shotgun_position;
+    [SerializeField]
+    private bool fired, reloading, landed;
+
+    [SerializeField]
+    private int shells;
+
+    private Animator anim, r_anim;
+
     private Transform cam_transform;
     private Rigidbody rb;
     private CapsuleCollider col;
     private Vector3 slide_vector;
     private Vector3 cam_pivot;
+
+    IEnumerator FireSequence()
+    {
+        fired = true;
+        anim.SetInteger("ViewmodelState", 1);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 1);
+        anim.SetInteger("ViewmodelState", 0);
+        yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
+        fired = false;
+        shells--;
+    }
+
+    IEnumerator BigFireSequence()
+    {
+        fired = true;
+        anim.SetInteger("ViewmodelState", 3);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 3);
+        anim.SetInteger("ViewmodelState", 0);
+        yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
+        fired = false;
+        shells--;
+        shells--;
+    }
+
+    IEnumerator ReloadSequence()
+    {
+        reloading = true;
+        anim.SetInteger("ViewmodelState", 2);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 2);
+        anim.SetInteger("ViewmodelState", 0);
+        yield return new WaitUntil(() => anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+        yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 0);
+        reloading = false;
+        shells = 2;
+    }
+
+    IEnumerator JumpSequence()
+    {
+        r_anim.SetInteger("RootState", 1);
+        yield return new WaitUntil(() => r_anim.GetInteger("RootState") == 1);
+        r_anim.SetInteger("RootState", 0);
+        yield return new WaitUntil(() => r_anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+    }
+
+    IEnumerator LandSequence()
+    {
+        r_anim.SetInteger("RootState", 2);
+        yield return new WaitUntil(() => r_anim.GetInteger("RootState") == 2);
+        r_anim.SetInteger("RootState", 0);
+        yield return new WaitUntil(() => r_anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+    }
 
     void Look()
     {
@@ -50,6 +114,41 @@ public class PlayerMovement : MonoBehaviour
 
         float vel_proj = Vector3.Dot(rb.velocity.normalized, transform.right) * Mathf.Clamp01(velocity_scalar);
         cam_transform.localRotation = Quaternion.Euler(-rot_y, 0.0f, Mathf.Lerp(cam_roll_amount, -cam_roll_amount, (vel_proj + 1.0f) / 2.0f));
+    }
+
+    void AnimateShotgun()
+    {
+        //Handle basic viewbobbing
+        float move_velocity = new Vector3(rb.velocity.x, 0.0f, rb.velocity.z).magnitude;
+        float x_lerp = 2.0f * Mathf.Abs((animation_tick-0.5f) / shotgun_frequency - Mathf.Floor((animation_tick - 0.5f) / shotgun_frequency + 0.5f));
+        float x_pos = Mathf.Lerp(-shotgun_sway_x, shotgun_sway_x, x_lerp);
+        x_pos = Mathf.Lerp(0.0f, x_pos, move_velocity / _movespeed);
+
+        float PI = Mathf.PI;
+        float y_lerp = Mathf.Abs(Mathf.Sin((PI * animation_tick) / (0.5f * shotgun_frequency) - (PI / (shotgun_frequency))));
+        float y_pos = Mathf.Lerp(shotgun_amplitude, 364.0f, y_lerp);
+        y_pos = Mathf.Lerp(364.0f, y_pos, move_velocity / _movespeed);
+        shotgun_position.anchoredPosition = new Vector2(x_pos, y_pos);
+
+        //Handle shooting animations
+        //normal behavior
+        if(shells > 0 && !reloading)
+        {
+            if (Input.GetButton("Fire1") && !fired)
+                StartCoroutine(FireSequence());
+
+            if (Input.GetButton("Fire2") && !fired && shells > 1)
+                StartCoroutine(BigFireSequence());
+
+            if (Input.GetKeyDown(KeyCode.R) && !reloading && shells < 2)
+                StartCoroutine(ReloadSequence());
+        }
+        //auto reload
+        else if(shells <=0)
+        {
+            if (!reloading)
+                StartCoroutine(ReloadSequence());
+        }
     }
 
     bool CheckGrounded()
@@ -232,8 +331,16 @@ public class PlayerMovement : MonoBehaviour
     // Start is called before the first frame update
     void Start()
     {
+        shells = 2;
+
         rot_y = 0.0f;
         max_slide_timer = slide_timer;
+
+        shotgun_root = (RectTransform)transform.GetChild(1).GetChild(1);
+        shotgun_position = (RectTransform)shotgun_root.GetChild(0);
+
+        anim = transform.GetChild(1).GetChild(1).GetChild(0).GetComponent<Animator>();
+        r_anim = transform.GetChild(1).GetChild(1).GetComponent<Animator>();
         cam_transform = Camera.main.transform;
         rb = GetComponent<Rigidbody>();
         col = GetComponent<CapsuleCollider>();
@@ -248,6 +355,7 @@ public class PlayerMovement : MonoBehaviour
     {
         grounded = CheckGrounded();
         Look();
+        AnimateShotgun();
         CheckSliding();
         if (grounded)
         {
@@ -260,6 +368,7 @@ public class PlayerMovement : MonoBehaviour
             if (Input.GetButtonDown("Jump") && rb.velocity.y <= 0.0f)
             {
                 rb.velocity = new Vector3(rb.velocity.x, jump_speed, rb.velocity.z);
+                StartCoroutine(JumpSequence());
                 if (sliding)
                 {
                     float current_vel = new Vector2(rb.velocity.x, rb.velocity.z).magnitude;
@@ -268,6 +377,8 @@ public class PlayerMovement : MonoBehaviour
                     set_slide_vector = false;
                 }
             }
+            if (!landed) StartCoroutine(LandSequence());
+            landed = true;
         }
         else
         {
@@ -276,6 +387,7 @@ public class PlayerMovement : MonoBehaviour
             else
                 Slide();
             set_slide_speed = false;
+            landed = false;
         }
     }
 
