@@ -21,6 +21,7 @@ public class PlayerMovement : MonoBehaviour
 
     public float viewbob_amplitude, viewbob_frequency, cam_roll_amount;
     public float shotgun_frequency, shotgun_amplitude, shotgun_sway_x;
+    public float death_cam_interp; 
 
     private bool grounded, sliding, aircrouching, set_slide_vector, set_slide_speed;
     private float rot_x, rot_y;
@@ -31,9 +32,13 @@ public class PlayerMovement : MonoBehaviour
 
     public Vector2 mouse_sens;
 
+    public Vector3 death_cam_height;
+
     private RectTransform shotgun_root, shotgun_position;
     [SerializeField]
     private bool fired, reloading, landed;
+
+    private bool dead;
     
     private Animator anim, r_anim;
 
@@ -44,6 +49,8 @@ public class PlayerMovement : MonoBehaviour
     private Vector3 cam_pivot;
 
     private PlayerStats stats;
+
+    public bool GetDead() { return dead; }
 
     IEnumerator FireSequence()
     {
@@ -385,6 +392,22 @@ public class PlayerMovement : MonoBehaviour
         }
     }
 
+    void DeathCam()
+    {
+        if (!dead)
+        {
+            animation_tick = 0.0f;
+            dead = true;
+        }
+        else
+        {
+            cam_transform.localPosition = Vector3.Lerp(new Vector3(0.0f, 0.5f, 0.0f), death_cam_height, Mathf.Clamp01(animation_tick * death_cam_interp));
+            if(stats.LastDamageDealer != null)
+                cam_transform.rotation = Quaternion.LookRotation((stats.LastDamageDealer.transform.position - transform.position).normalized, transform.up);
+            shotgun_position.anchoredPosition = Vector3.Lerp(new Vector3(0.0f, 364.1079f, 0.0f), new Vector3(0.0f, 37.0f, 0.0f), Mathf.Clamp01(animation_tick * death_cam_interp));
+        }
+    }
+
     // Start is called before the first frame update
     void Start()
     {
@@ -392,6 +415,8 @@ public class PlayerMovement : MonoBehaviour
 
         rot_y = 0.0f;
         max_slide_timer = slide_timer;
+
+        dead = false;
 
         shotgun_root = (RectTransform)transform.GetChild(1).GetChild(1);
         shotgun_position = (RectTransform)shotgun_root.GetChild(0);
@@ -410,6 +435,13 @@ public class PlayerMovement : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        //don't do anything if you die
+        if(stats.HP <= 0)
+        {
+            DeathCam();
+            return;
+        }
+
         grounded = CheckGrounded();
         Look();
         AnimateShotgun();
@@ -450,6 +482,9 @@ public class PlayerMovement : MonoBehaviour
 
     private void FixedUpdate()
     {
-        animation_tick += Time.deltaTime * rb.velocity.magnitude / _movespeed;
+        if (!dead)
+            animation_tick += Time.deltaTime * rb.velocity.magnitude / _movespeed;
+        else
+            animation_tick += Time.deltaTime;
     }
 }

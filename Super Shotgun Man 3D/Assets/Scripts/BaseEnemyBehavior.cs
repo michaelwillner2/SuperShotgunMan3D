@@ -25,7 +25,7 @@ public class BaseEnemyBehavior : MonoBehaviour
     }
 
     [SerializeField]
-    private int _hp;
+    private int _hp, min_damage, max_damage;
 
     private int current_frame;
     private int current_animation;
@@ -36,7 +36,7 @@ public class BaseEnemyBehavior : MonoBehaviour
     [SerializeField]
     private float step_distance, step_frequency, max_step_height;
     [SerializeField]
-    private float min_attack_distance, max_attack_distance;
+    private float min_attack_distance, max_attack_distance, spread;
     [SerializeField]
     private float knockback_resistance;
 
@@ -46,7 +46,7 @@ public class BaseEnemyBehavior : MonoBehaviour
     private int step_count, targeting_threshold, max_reaction_time;
 
     [SerializeField]
-    private Vector3 lookdir;
+    private Vector3 lookdir, death_col_offset;
     [SerializeField]
     private Texture2DArray spritesheet;
 
@@ -56,11 +56,17 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     private bool anim_completed, collision_off;
 
+    [SerializeField]
+    private string death_message;
+
     private Material visual_mat;
     [SerializeField]
     private List<Animation> animations;
     private BoxCollider col;
     private GameObject target;
+
+    [SerializeField]
+    private Object projectile;
 
     public int HP
     {
@@ -91,7 +97,7 @@ public class BaseEnemyBehavior : MonoBehaviour
     {
         Vector3 half_extents = new Vector3(col.size.x, col.size.y, col.size.z) * 0.99f;
         RaycastHit box_hit;
-        bool detect_wall = !Physics.BoxCast(transform.position, half_extents, direction, out box_hit, transform.rotation, step_distance, LayerMask.GetMask("Ground") | LayerMask.GetMask("Player"));
+        bool detect_wall = !Physics.BoxCast(transform.position, half_extents, direction, out box_hit, transform.rotation, step_distance, LayerMask.GetMask("Ground") | LayerMask.GetMask("Player") | LayerMask.GetMask("Enemy"));
 
         //if a wall is detected see if you can step over the wall
         Vector3 raycast_offset = transform.position + new Vector3(half_extents.x * direction.x, 0.0f, half_extents.z * direction.z) + direction * step_distance * 0.6f;
@@ -373,6 +379,40 @@ public class BaseEnemyBehavior : MonoBehaviour
         Debug.Log($"Hey, how's it goin! The current frame is: {current_frame}!");
     }
 
+    public void FireHitscan(Vector3 direction)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(transform.position, direction, out hit, Mathf.Infinity, LayerMask.GetMask("Ground") | LayerMask.GetMask("Player")))
+        {
+            if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
+                FXUtils.InstanceFXObject(0, hit.point, Quaternion.identity);
+            else
+            {
+                FXUtils.InstanceFXObject(1, hit.point, Quaternion.FromToRotation(Vector3.forward, -direction));
+                hit.collider.gameObject.GetComponent<PlayerStats>().TakeDamage((int)MathUtils.GaussianRandom(min_damage, max_damage), direction.normalized, gameObject);
+                if (!hit.collider.GetComponent<PlayerMovement>().GetDead() && hit.collider.GetComponent<PlayerStats>().HP <= 0)
+                    hit.collider.GetComponent<PlayerStats>().AnnounceText = death_message;
+            }
+
+            MathUtils.DrawPoint(hit.point, 0.04f, Color.cyan, Mathf.Infinity);
+        }
+    }
+
+    public void FaceTarget() { lookdir = (target.transform.position - transform.position).normalized; }
+
+    public virtual void Fire()
+    {
+        //if no projectile is specified, fire a hitscan shot forward at a random spread angle
+        if(projectile == null)
+        {
+            Vector3 shot_dir = lookdir;
+            shot_dir = Quaternion.AngleAxis(spread * MathUtils.GaussianRandom(-1.0f, 1.0f), Vector3.up) * shot_dir;
+            shot_dir = Quaternion.AngleAxis(spread * MathUtils.GaussianRandom(-1.0f, 1.0f), Vector3.right) * shot_dir;
+            lookdir = shot_dir;
+            FireHitscan(lookdir);
+        }
+    }
+
     public virtual void AI()
     {
         //in this scenario attack the player at greater frequencies at close range, must have LOS
@@ -395,7 +435,6 @@ public class BaseEnemyBehavior : MonoBehaviour
                 if (MathUtils.GaussianRandom(0.0f, 100.0f) <= attack_probability)
                 {
                     current_animation = 1;
-                    lookdir = (target.transform.position - transform.position).normalized;
                 }
                 else if (current_animation != 1)
                 {
@@ -428,6 +467,8 @@ public class BaseEnemyBehavior : MonoBehaviour
                 {
                     Physics.IgnoreCollision(col, GameObject.FindGameObjectWithTag("Enemy").GetComponent<Collider>());
                 }
+                col.center = death_col_offset;
+                col.size /= 4;
                 collision_off = true;
             }
         }

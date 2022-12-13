@@ -15,6 +15,7 @@ public class PlayerStats : MonoBehaviour
     [SerializeField]
     private Sprite[] shell_ui_images;
     private Sprite powerup_sprite;
+    private GameObject last_damage_dealer;
 
     public int HP
     {
@@ -93,7 +94,16 @@ public class PlayerStats : MonoBehaviour
         }
     }
 
-    public void TakeDamage(int amount)
+    public GameObject LastDamageDealer
+    {
+        get { return last_damage_dealer; }
+        set
+        {
+            last_damage_dealer = value;
+        }
+    }
+
+    public void TakeDamage(int amount, GameObject dealer = null)
     {
         int armor_reduction = 0;
         if (ap > 0)
@@ -112,10 +122,12 @@ public class PlayerStats : MonoBehaviour
         }
 
         HP = hp - amount + armor_reduction;
+        if(hp > 0)
         damage_vignette.color = Color.Lerp(new Color(1.0f, 0.0f, 0.0f, 0.0f), Color.red, Mathf.Clamp01(amount / 100.0f));
+        if (dealer != null && hp > 0) last_damage_dealer = dealer;
     }
 
-    public void TakeDamage(int amount, Vector3 direction)
+    public void TakeDamage(int amount, Vector3 direction, GameObject dealer = null)
     {
         int armor_reduction = 0;
         if (ap > 0)
@@ -135,7 +147,9 @@ public class PlayerStats : MonoBehaviour
 
         HP = hp - amount + armor_reduction;
         GetComponent<Rigidbody>().AddForce(direction.normalized * ((float)amount / knockback_resistance));
+        if(hp > 0)
         damage_vignette.color = Color.Lerp(new Color(1.0f, 0.0f, 0.0f, 0.0f), Color.red, Mathf.Clamp01(amount / 100.0f));
+        if (dealer != null && hp > 0) last_damage_dealer = dealer;
     }
 
     void UpdateAnnounceText()
