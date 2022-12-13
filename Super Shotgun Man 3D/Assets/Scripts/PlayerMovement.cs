@@ -5,6 +5,10 @@ using UnityEngine.UI;
 
 public class PlayerMovement : MonoBehaviour
 {
+    public int pellet_count;
+
+    public float spread_angle;
+
     public float friction, c_friction;
     public float _movespeed, _accelspeed, horizontal_gravity;
     public float airmult_cap, jump_speed;
@@ -43,6 +47,7 @@ public class PlayerMovement : MonoBehaviour
 
     IEnumerator FireSequence()
     {
+        Fire();
         fired = true;
         anim.SetInteger("ViewmodelState", 1);
         yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 1);
@@ -55,6 +60,7 @@ public class PlayerMovement : MonoBehaviour
 
     IEnumerator BigFireSequence()
     {
+        Fire(true);
         fired = true;
         anim.SetInteger("ViewmodelState", 3);
         yield return new WaitUntil(() => anim.GetInteger("ViewmodelState") == 3);
@@ -92,6 +98,55 @@ public class PlayerMovement : MonoBehaviour
         yield return new WaitUntil(() => r_anim.GetInteger("RootState") == 2);
         r_anim.SetInteger("RootState", 0);
         yield return new WaitUntil(() => r_anim.GetCurrentAnimatorStateInfo(0).normalizedTime > 1);
+    }
+
+    void FirePellet(Vector3 direction)
+    {
+        RaycastHit hit;
+        if (Physics.Raycast(cam_transform.position, direction, out hit, Mathf.Infinity, LayerMask.GetMask("Ground") | LayerMask.GetMask("Enemy")))
+        {
+            if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
+                FXUtils.InstanceFXObject(0, hit.point, Quaternion.identity);
+            else
+                FXUtils.InstanceFXObject(1, hit.point, Quaternion.FromToRotation(Vector3.forward, -direction));
+
+            MathUtils.DrawPoint(hit.point, 0.04f, Color.cyan, Mathf.Infinity);
+        }
+    }
+
+    void Fire(bool big = false)
+    {
+        int mod_count = pellet_count;
+        float mod_spread = spread_angle;
+        if (big)
+        {
+            mod_count *= 2;
+            mod_spread *= 2f;
+        }
+        //generate a square shot pattern based off from the player's view vector
+        int side_length = (int)Mathf.Sqrt(mod_count);
+        for (int i = 0; i < mod_count; i++)
+        {
+            //set the shotgun vector to it's starting position
+            Vector3 raycast_dir = cam_transform.forward;
+            raycast_dir = Quaternion.AngleAxis(mod_spread / 2.0f, cam_transform.up) * raycast_dir;
+            raycast_dir = Quaternion.AngleAxis(mod_spread / 2.0f, cam_transform.right) * raycast_dir;
+
+            //calculate the amount of times it should rotate down
+            int y_row = i / side_length;
+
+            //calculate the amount of times it should rotate to the right
+            int x_col = i;
+            if (i >= side_length)
+                x_col = i % side_length;
+
+            //rotate the vector
+            raycast_dir = Quaternion.AngleAxis(-(mod_spread / (float)(side_length - 1)) * (float)x_col, cam_transform.up) * raycast_dir;
+            raycast_dir = Quaternion.AngleAxis(-(mod_spread / (float)(side_length - 1)) * (float)y_row, cam_transform.right) * raycast_dir;
+
+            //raycast
+            FirePellet(raycast_dir);
+        }
     }
 
     void Look()

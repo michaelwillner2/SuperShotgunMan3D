@@ -23,21 +23,30 @@ public class BaseEnemyBehavior : MonoBehaviour
         public List<AnimAction> actions;
     }
 
-    public int current_frame;
-    public int current_animation;
+    private int _hp;
 
-    public int step_count_max, step_count_min, reaction_time;
+    private int current_frame;
+    private int current_animation;
 
-    public float step_distance, step_frequency, max_step_height;
-    public float min_attack_distance, max_attack_distance;
+    [SerializeField]
+    private int step_count_max, step_count_min, reaction_time;
+
+    [SerializeField]
+    private float step_distance, step_frequency, max_step_height;
+    [SerializeField]
+    private float min_attack_distance, max_attack_distance;
+    [SerializeField]
+    private float knockback_resistance;
 
     private int last_animation, last_frame;
 
     [SerializeField]
     private int step_count, targeting_threshold, max_reaction_time;
 
-    public Vector3 lookdir;
-    public Texture2DArray spritesheet;
+    [SerializeField]
+    private Vector3 lookdir;
+    [SerializeField]
+    private Texture2DArray spritesheet;
 
     private float anim_tick;
 
@@ -50,6 +59,30 @@ public class BaseEnemyBehavior : MonoBehaviour
     private List<Animation> animations;
     private BoxCollider col;
     private GameObject target;
+
+    public int HP
+    {
+        get { return _hp; }
+        set
+        {
+            _hp = value;
+        }
+    }
+
+    public void TakeDamage(int amount)
+    {
+        _hp -= amount;
+        if (_hp < 0)
+            _hp = 0;
+    }
+
+    public void TakeDamage(int amount, Vector3 direction)
+    {
+        _hp -= amount;
+        if (_hp < 0)
+            _hp = 0;
+        GetComponent<Rigidbody>().AddForce(direction.normalized * ((float)amount / knockback_resistance));
+    }
 
     //function handles collision checks
     public virtual bool CheckNextPostion(Vector3 direction)

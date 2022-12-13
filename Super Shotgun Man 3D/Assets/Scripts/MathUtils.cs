@@ -129,4 +129,17 @@ public static class MathUtils
         Vector3 direction = point - pivot;
         return pivot + rotation * direction;
     }
+
+    public static void DrawPoint(Vector4 pos, float scale, Color color, float duration = 0.0f)
+    {
+        var sX = pos + new Vector4(+scale, 0, 0);
+        var eX = pos + new Vector4(-scale, 0, 0);
+        var sY = pos + new Vector4(0, +scale, 0);
+        var eY = pos + new Vector4(0, -scale, 0);
+        var sZ = pos + new Vector4(0, 0, +scale);
+        var eZ = pos + new Vector4(0, 0, -scale);
+        UnityEngine.Debug.DrawLine(sX, eX, color, duration);
+        UnityEngine.Debug.DrawLine(sY, eY, color, duration);
+        UnityEngine.Debug.DrawLine(sZ, eZ, color, duration);
+    }
 }
