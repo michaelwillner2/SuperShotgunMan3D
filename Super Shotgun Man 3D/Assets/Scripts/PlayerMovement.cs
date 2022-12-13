@@ -5,7 +5,7 @@ using UnityEngine.UI;
 
 public class PlayerMovement : MonoBehaviour
 {
-    public int pellet_count;
+    public int pellet_count, min_pellet_damage, max_pellet_damage;
 
     public float spread_angle;
 
@@ -108,7 +108,10 @@ public class PlayerMovement : MonoBehaviour
             if (hit.collider.gameObject.layer == LayerMask.NameToLayer("Ground"))
                 FXUtils.InstanceFXObject(0, hit.point, Quaternion.identity);
             else
+            {
                 FXUtils.InstanceFXObject(1, hit.point, Quaternion.FromToRotation(Vector3.forward, -direction));
+                hit.collider.gameObject.GetComponent<BaseEnemyBehavior>().TakeDamage((int)MathUtils.GaussianRandom(min_pellet_damage, max_pellet_damage), direction.normalized);
+            }
 
             MathUtils.DrawPoint(hit.point, 0.04f, Color.cyan, Mathf.Infinity);
         }

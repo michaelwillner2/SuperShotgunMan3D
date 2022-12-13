@@ -19,10 +19,12 @@ public class BaseEnemyBehavior : MonoBehaviour
         public int frame_count;
         public bool looping;
         public float speed_fps;
+        public bool directional;
 
         public List<AnimAction> actions;
     }
 
+    [SerializeField]
     private int _hp;
 
     private int current_frame;
@@ -52,7 +54,7 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     private float step_frequency_max, step_height;
 
-    private bool anim_completed;
+    private bool anim_completed, collision_off;
 
     private Material visual_mat;
     [SerializeField]
@@ -120,6 +122,13 @@ public class BaseEnemyBehavior : MonoBehaviour
 
     public virtual void UpdateAnimationViewAngle()
     {
+        //don't change anything if the animation has no directionality to it
+        if (!animations[current_animation].directional)
+        {
+            visual_mat.SetFloat("_Flip", 0);
+            visual_mat.SetFloat("_SpriteIndex", animations[current_animation].starting_index + current_frame);
+            return;
+        }
         //First get the player's viewing angle and take the dot product with the enemy's look direction
         Vector2 eviewangle = new Vector2(lookdir.x, lookdir.z).normalized;
         Vector2 pviewangle = new Vector2(transform.position.x - Camera.main.transform.position.x, transform.position.z - Camera.main.transform.position.z).normalized;
@@ -367,43 +376,65 @@ public class BaseEnemyBehavior : MonoBehaviour
     public virtual void AI()
     {
         //in this scenario attack the player at greater frequencies at close range, must have LOS
-        if (step_count == 0 && reaction_time <= 0)
+        if (_hp > 0.0f)
         {
-            if (anim_completed)
+            if (step_count == 0 && reaction_time <= 0)
             {
-                current_animation = 0;
-                ChasePlayer(target);
-                return;
-            }
-            //calculate attack probability
-            float max_magnitude = max_attack_distance - min_attack_distance;
-            float attack_magnitude = Vector3.Distance(target.transform.position, transform.position) - min_attack_distance;
-            float distance_lerp = attack_magnitude / max_magnitude;
+                if (anim_completed)
+                {
+                    current_animation = 0;
+                    ChasePlayer(target);
+                    return;
+                }
+                //calculate attack probability
+                float max_magnitude = max_attack_distance - min_attack_distance;
+                float attack_magnitude = Vector3.Distance(target.transform.position, transform.position) - min_attack_distance;
+                float distance_lerp = attack_magnitude / max_magnitude;
 
-            float attack_probability = Mathf.Lerp(100.0f, 0.0f, distance_lerp);
-            if (MathUtils.GaussianRandom(0.0f, 100.0f) <= attack_probability)
-            {
-                current_animation = 1;
-                lookdir = (target.transform.position - transform.position).normalized;
+                float attack_probability = Mathf.Lerp(100.0f, 0.0f, distance_lerp);
+                if (MathUtils.GaussianRandom(0.0f, 100.0f) <= attack_probability)
+                {
+                    current_animation = 1;
+                    lookdir = (target.transform.position - transform.position).normalized;
+                }
+                else if (current_animation != 1)
+                {
+                    current_animation = 0;
+                    ChasePlayer(target);
+                    return;
+                }
             }
-            else if(current_animation != 1)
+            else
             {
-                current_animation = 0;
-                ChasePlayer(target);
-                return;
+                if (step_frequency > 0.0f)
+                    step_frequency -= Time.deltaTime;
+                else
+                {
+                    ChasePlayer(target);
+                    step_frequency = step_frequency_max;
+                }
             }
         }
         else
         {
-            if (step_frequency > 0.0f)
-                step_frequency -= Time.deltaTime;
-            else
+            current_animation = 2;
+            if (!collision_off)
             {
-                ChasePlayer(target);
-                step_frequency = step_frequency_max;
+                //ignore collision with the player and all enemies in the map
+                Physics.IgnoreCollision(col, GameObject.FindGameObjectWithTag("Player").GetComponent<Collider>());
+
+                GameObject[] enemies = GameObject.FindGameObjectsWithTag("Enemy");
+                for (int i = 0; i < enemies.Length; i++)
+                {
+                    Physics.IgnoreCollision(col, GameObject.FindGameObjectWithTag("Enemy").GetComponent<Collider>());
+                }
+                collision_off = true;
             }
         }
     }
+
+    //override this function in other ai to override start function variables
+    public virtual void StartOverrides() { }
     
     // Start is called before the first frame update
     void Start()
@@ -415,12 +446,14 @@ public class BaseEnemyBehavior : MonoBehaviour
         max_reaction_time = reaction_time;
         step_height = 0.0f;
         lookdir = transform.forward;
+        collision_off = false;
 
         //create a new material instance so that other enemies are unaffected
         visual_mat = transform.GetChild(0).GetComponent<MeshRenderer>().material;
         col = GetComponent<BoxCollider>();
 
         target = GameObject.FindGameObjectWithTag("Player");
+        StartOverrides();
     }
 
     // Update is called once per frame
