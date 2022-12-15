@@ -12,6 +12,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: eee7f58c2c7a67b4690849615f619872, type: 3}
   m_Name: SFXContainer
   m_EditorClassIdentifier: 
-  MUSIC_ARRAY: []
   VOICE_ARRAY: []
-  SFX_ARRAY: []
+  SFX_ARRAY:
+  - {fileID: 8300000, guid: 9133582c2f34ab246acbc682916ca7e7, type: 3}
+  - {fileID: 8300000, guid: 58a3ba6c429148a4dbf92c4e87c81ad4, type: 3}
+  MUSIC_ARRAY: []

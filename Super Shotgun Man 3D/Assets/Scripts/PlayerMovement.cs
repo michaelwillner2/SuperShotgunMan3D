@@ -52,6 +52,10 @@ public class PlayerMovement : MonoBehaviour
 
     public bool GetDead() { return dead; }
 
+    public void PlayFireSound() { AudioUtils.InstanceSound(0, transform.position, this, transform); }
+    public void PlayFatFireSound() { AudioUtils.InstanceSound(0, transform.position, this, transform, false, 1.5f, 0.8f); }
+    public void PlayReloadSound() { AudioUtils.InstanceSound(1, transform.position, this, transform); }
+
     IEnumerator FireSequence()
     {
         Fire();

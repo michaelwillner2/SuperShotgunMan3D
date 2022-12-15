@@ -4,10 +4,11 @@ using UnityEngine;
 
 public static class AudioUtils
 {
-    private static AudioScriptableObject sound_table;
+    private static AudioScriptableObject sound_table = Resources.Load<AudioScriptableObject>("SFXContainer");
     
     private static IEnumerator PlayOnce(AudioSource sound)
     {
+        sound.Play();
         yield return new WaitUntil(() => sound.isPlaying);
         yield return new WaitUntil(() => !sound.isPlaying);
         MonoBehaviour.Destroy(sound.gameObject);
